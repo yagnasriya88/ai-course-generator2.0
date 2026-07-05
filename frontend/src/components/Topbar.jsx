@@ -16,7 +16,7 @@ function Topbar() {
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/60 bg-white/70 px-4 backdrop-blur-xl">
+      <header className="relative z-20 flex h-14 shrink-0 items-center justify-between border-b border-white/60 bg-white/70 px-4 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <button
             type="button"

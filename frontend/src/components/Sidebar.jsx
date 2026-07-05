@@ -215,7 +215,7 @@ function Sidebar() {
 
   return (
     <aside
-      className={`relative hidden shrink-0 flex-col overflow-hidden border-r border-white/60 bg-white/70 py-5 backdrop-blur-xl transition-[width] duration-200 sm:flex ${
+      className={`relative z-20 hidden shrink-0 flex-col overflow-hidden border-r border-white/60 bg-white/70 py-5 backdrop-blur-xl transition-[width] duration-200 sm:flex ${
         sidebarCollapsed ? 'w-20 px-3' : 'w-72 px-4'
       }`}
     >

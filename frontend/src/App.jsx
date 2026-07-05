@@ -1,36 +1,53 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
+import LoadingSpinner from './components/LoadingSpinner'
 import ProtectedRoute from './components/ProtectedRoute'
-import Login from './pages/Login'
-import Signup from './pages/Signup'
-import Dashboard from './pages/Dashboard'
-import CreateCourse from './pages/CreateCourse'
-import CourseList from './pages/CourseList'
-import Course from './pages/Course'
-import Lesson from './pages/Lesson'
-import VideoDetail from './pages/VideoDetail'
-import GenerationJobs from './pages/GenerationJobs'
+
+// Route-level code splitting: each page (and everything it imports — Lesson.jsx's
+// diagram/math rendering chain alone pulls in mermaid+d3+katex, ~1.3MB) previously
+// loaded as one eager bundle on every visit, even to /login. Lazy-loading means a
+// page's dependencies are only fetched once someone actually navigates there.
+const Login = lazy(() => import('./pages/Login'))
+const Signup = lazy(() => import('./pages/Signup'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const CreateCourse = lazy(() => import('./pages/CreateCourse'))
+const CourseList = lazy(() => import('./pages/CourseList'))
+const Course = lazy(() => import('./pages/Course'))
+const Lesson = lazy(() => import('./pages/Lesson'))
+const VideoDetail = lazy(() => import('./pages/VideoDetail'))
+const GenerationJobs = lazy(() => import('./pages/GenerationJobs'))
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <LoadingSpinner />
+    </div>
+  )
+}
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/create" element={<CreateCourse />} />
-          <Route path="/jobs" element={<GenerationJobs />} />
-          <Route path="/courses" element={<CourseList />} />
-          <Route path="/course/:courseId" element={<Course />} />
-          <Route path="/course/:courseId/lesson/:lessonId" element={<Lesson />} />
-          <Route
-            path="/course/:courseId/lesson/:lessonId/video/:videoIndex"
-            element={<VideoDetail />}
-          />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/create" element={<CreateCourse />} />
+            <Route path="/jobs" element={<GenerationJobs />} />
+            <Route path="/courses" element={<CourseList />} />
+            <Route path="/course/:courseId" element={<Course />} />
+            <Route path="/course/:courseId/lesson/:lessonId" element={<Lesson />} />
+            <Route
+              path="/course/:courseId/lesson/:lessonId/video/:videoIndex"
+              element={<VideoDetail />}
+            />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   )
 }
 

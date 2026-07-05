@@ -130,12 +130,17 @@ async def get_platform_templates() -> list[Course]:
     return [Course(**doc) async for doc in cursor]
 
 
-async def user_has_clone(owner_id: str, template_id: str) -> bool:
+async def user_has_clone_ids(owner_id: str, template_ids: list[str]) -> set[str]:
+    """Batched existence check — one round trip for all templates instead of one
+    per template, since ensure_platform_courses_for_user runs on every dashboard
+    and course-list load and this was previously N+1 queries on the hot path."""
+    if not template_ids:
+        return set()
     db = get_database()
-    doc = await db[COLLECTION].find_one(
-        {"owner_id": owner_id, "template_id": template_id}, {"_id": 1}
+    cursor = db[COLLECTION].find(
+        {"owner_id": owner_id, "template_id": {"$in": template_ids}}, {"template_id": 1}
     )
-    return doc is not None
+    return {doc["template_id"] async for doc in cursor}
 
 
 async def clone_course_for_user(template: Course, owner_id: str) -> Course:
@@ -203,8 +208,11 @@ async def clone_course_for_user(template: Course, owner_id: str) -> Course:
 
 async def ensure_platform_courses_for_user(owner_id: str) -> None:
     templates = await get_platform_templates()
+    if not templates:
+        return
+    existing_ids = await user_has_clone_ids(owner_id, [t.id for t in templates])
     for template in templates:
-        if not await user_has_clone(owner_id, template.id):
+        if template.id not in existing_ids:
             await clone_course_for_user(template, owner_id)
 
 
