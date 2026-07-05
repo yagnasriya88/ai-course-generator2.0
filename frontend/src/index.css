@@ -35,7 +35,19 @@
   --color-surface-100: #f1f5f9;
   --color-surface-200: #e2e8f0;
 
+  /* Blush: soft pastel pink — illustration "halo" backdrops only, not for text/buttons */
+  --color-blush-100: #fde7ee;
+  --color-blush-200: #fbd0dd;
+
   --shadow-glow: 0 0 0 1px rgba(37, 99, 235, 0.12), 0 8px 24px -8px rgba(37, 99, 235, 0.3);
+}
+
+:root {
+  /* Plain CSS custom properties — Tailwind v4 has no gradient theme category, so
+     these are consumed via style={{ backgroundImage: 'var(--gradient-hero)' }} or
+     bg-[image:var(--gradient-hero)], not an auto-generated utility class. */
+  --gradient-hero: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-800));
+  --gradient-card: linear-gradient(135deg, var(--color-primary-50), var(--color-surface-0));
 }
 
 :root {
@@ -45,8 +57,13 @@
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: var(--color-surface-50);
   color: #0f172a;
+  background-color: var(--color-surface-50);
+  background-image:
+    radial-gradient(circle, var(--color-primary-200) 1px, transparent 1px),
+    linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-surface-50) 45%, #ffffff 100%);
+  background-size: 22px 22px, 100% 100%;
+  background-attachment: fixed;
 }
 
 h1,

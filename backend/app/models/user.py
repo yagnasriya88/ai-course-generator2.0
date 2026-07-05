@@ -33,4 +33,24 @@ class User(BaseModel):
     name: str
     email: str
     password_hash: str
+    xp: int = 0
+    gold: int = 0
+    current_streak: int = 0
+    longest_streak: int = 0
+    last_active_date: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+XP_PER_LEVEL = 500
+
+
+def level_progress(xp: int) -> dict:
+    """Derives level/progress from xp so there's one source of truth — level is
+    never stored, only computed."""
+    level = xp // XP_PER_LEVEL + 1
+    xp_into_level = xp % XP_PER_LEVEL
+    return {
+        "level": level,
+        "xp_into_level": xp_into_level,
+        "xp_to_next": XP_PER_LEVEL - xp_into_level,
+    }

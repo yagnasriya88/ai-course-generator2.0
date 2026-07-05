@@ -55,9 +55,14 @@ class Lesson(BaseModel):
     visual_aids: list[VisualAid] = Field(default_factory=list)
     hinglish: HinglishContent | None = None
     is_enriched: bool = False
-    # Whether Quiz/Video/Visual agents have run (on first lesson view). Separate from
-    # is_enriched (base content, generated eagerly by Module Generator). Hinglish is
-    # excluded — it's an explicit "Explain in Hinglish" button per spec, not automatic.
+    # Whether Visual agent has run (on first lesson view). Separate from is_enriched
+    # (base content, generated eagerly by Module Generator). Videos are tracked with
+    # their own flag below rather than folded into this one, because video discovery
+    # (Gemini, low free-tier quota) fails far more often than visual aids (OpenAI) — a
+    # video failure must not permanently mark the lesson enriched, or it would never
+    # retry once quota resets. Hinglish is excluded — it's an explicit "Explain in
+    # Hinglish" button per spec, not automatic.
     auto_enriched: bool = False
+    videos_enriched: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -34,11 +34,19 @@ async def find_lesson_by_stub(course_id: str, module_id: str, lesson_stub_id: st
     return await get_lesson(lesson_stub_id)
 
 
+async def list_lessons_by_course_ids(course_ids: list[str]) -> list[Lesson]:
+    if not course_ids:
+        return []
+    db = get_database()
+    cursor = db[COLLECTION].find({"course_id": {"$in": course_ids}})
+    return [Lesson(**doc) async for doc in cursor]
+
+
 async def set_visual_aids(lesson_id: str, aids: list[VisualAid]) -> None:
     db = get_database()
     await db[COLLECTION].update_one(
         {"_id": ObjectId(lesson_id)},
-        {"$set": {"visual_aids": [a.model_dump() for a in aids]}},
+        {"$set": {"visual_aids": [a.model_dump() for a in aids], "auto_enriched": True}},
     )
 
 
@@ -46,7 +54,7 @@ async def set_videos(lesson_id: str, videos: list[VideoRecommendation]) -> None:
     db = get_database()
     await db[COLLECTION].update_one(
         {"_id": ObjectId(lesson_id)},
-        {"$set": {"videos": [v.model_dump() for v in videos]}},
+        {"$set": {"videos": [v.model_dump() for v in videos], "videos_enriched": True}},
     )
 
 
@@ -55,12 +63,4 @@ async def set_hinglish(lesson_id: str, hinglish: HinglishContent) -> None:
     await db[COLLECTION].update_one(
         {"_id": ObjectId(lesson_id)},
         {"$set": {"hinglish": hinglish.model_dump()}},
-    )
-
-
-async def mark_auto_enriched(lesson_id: str) -> None:
-    db = get_database()
-    await db[COLLECTION].update_one(
-        {"_id": ObjectId(lesson_id)},
-        {"$set": {"auto_enriched": True}},
     )

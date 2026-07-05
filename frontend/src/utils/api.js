@@ -43,11 +43,24 @@ export const login = (payload) =>
 
 export const getMe = () => request('/auth/me')
 
+export const exportMyData = () => request('/auth/me/export')
+
 // Courses
+// Course generation runs on a persistent job queue (can take a minute+) —
+// this only enqueues the request and returns the job immediately; poll
+// getGenerationJob(job._id) for status instead of waiting on this call.
 export const generateCourse = (payload) =>
   request('/courses/generate', { method: 'POST', body: JSON.stringify(payload) })
 
+export const getGenerationJob = (jobId) => request(`/courses/jobs/${jobId}`)
+
+export const listGenerationJobs = () => request('/courses/jobs')
+
 export const listCourses = () => request('/courses')
+
+export const getDashboard = () => request('/dashboard')
+
+export const listQuizzes = () => request('/courses/quizzes')
 
 export const getCourse = (courseId) => request(`/courses/${courseId}`)
 
@@ -75,6 +88,12 @@ export const getVideoNotes = (lessonId, videoUrl) =>
     body: JSON.stringify({ video_url: videoUrl }),
   })
 
+export const askAboutVideo = (lessonId, videoUrl, question) =>
+  request(`/lessons/${lessonId}/videos/ask`, {
+    method: 'POST',
+    body: JSON.stringify({ video_url: videoUrl, question }),
+  })
+
 export const generateHinglish = (lessonId) =>
   request(`/lessons/${lessonId}/hinglish`, { method: 'POST' })
 
@@ -83,6 +102,9 @@ export const askTutor = (lessonId, question) =>
     method: 'POST',
     body: JSON.stringify({ question }),
   })
+
+export const askGeneralChat = (question) =>
+  request('/chat/ask', { method: 'POST', body: JSON.stringify({ question }) })
 
 export const setLessonCompleted = (lessonId, completed) =>
   request(`/lessons/${lessonId}/complete`, {

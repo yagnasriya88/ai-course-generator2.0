@@ -1,8 +1,13 @@
+import logging
+
 from crewai import Agent, Crew, Task
 
 from app.agents.llm import get_llm
+from app.agents.mermaid_validator import validate_mermaid
 from app.agents.schemas import VisualAidsSchema
 from app.models.lesson import Lesson, VisualAid
+
+logger = logging.getLogger(__name__)
 
 
 def build_visual_agent() -> Agent:
@@ -61,7 +66,16 @@ async def generate_visual_aids(lesson: Lesson) -> list[VisualAid]:
     crew = Crew(agents=[agent], tasks=[task], verbose=False)
     await crew.kickoff_async()
     result: VisualAidsSchema = task.output.pydantic
-    return [
-        VisualAid(type=aid.type, title=aid.title, data={"mermaid": aid.mermaid})
-        for aid in result.aids
-    ]
+    aids: list[VisualAid] = []
+    for aid in result.aids:
+        violations = validate_mermaid(aid.type, aid.mermaid)
+        if violations:
+            logger.warning(
+                "Dropping visual aid %r for lesson %s — invalid mermaid syntax: %s",
+                aid.title,
+                lesson.id,
+                violations,
+            )
+            continue
+        aids.append(VisualAid(type=aid.type, title=aid.title, data={"mermaid": aid.mermaid}))
+    return aids

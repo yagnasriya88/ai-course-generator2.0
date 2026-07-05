@@ -1,6 +1,6 @@
 const GRADIENTS = [
   'from-blue-500 to-indigo-600',
-  'from-violet-500 to-purple-600',
+  'from-sky-500 to-primary-600',
   'from-emerald-500 to-teal-600',
   'from-amber-500 to-orange-600',
   'from-rose-500 to-pink-600',

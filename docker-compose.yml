@@ -1,7 +1,7 @@
 services:
   mongo:
     image: mongo:7
-    container_name: text-to-learn-mongo
+    container_name: learnify-ai-mongo
     restart: unless-stopped
     ports:
       - "27017:27017"

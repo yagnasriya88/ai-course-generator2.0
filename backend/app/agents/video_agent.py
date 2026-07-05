@@ -11,12 +11,12 @@ import json
 import httpx
 from google.genai import types
 
-from app.agents.gemini_client import GEMINI_MODEL_NAME, client, strip_json_fences
+from app.agents.gemini_client import GEMINI_MODEL_NAME, generate_content, strip_json_fences
 from app.models.lesson import Lesson, VideoRecommendation
 from app.models.video_note import TimestampNote, VideoNote
 
 
-async def _resolve_redirect(http_client: httpx.AsyncClient, grounding_url: str) -> str | None:
+async def resolve_grounding_redirect(http_client: httpx.AsyncClient, grounding_url: str) -> str | None:
     """grounding_chunks give a vertexaisearch.cloud.google.com redirect, not the
     real URL — resolve it. httpx does not follow redirects by default, so a 3xx
     response with a Location header is expected here, not an error."""
@@ -44,7 +44,7 @@ async def discover_videos(lesson: Lesson, max_results: int = 3) -> list[VideoRec
     """The model's own JSON output can name a plausible-but-hallucinated video
     ID even with grounding enabled — only `grounding_metadata.grounding_chunks`
     (the actual search citations) are trustworthy for the URL itself."""
-    response = await client.aio.models.generate_content(
+    response = await generate_content(
         model=GEMINI_MODEL_NAME,
         contents=(
             f"Find {max_results} high-quality YouTube videos that teach: "
@@ -66,7 +66,7 @@ async def discover_videos(lesson: Lesson, max_results: int = 3) -> list[VideoRec
                 break
             if not chunk.web or not chunk.web.uri:
                 continue
-            resolved_url = await _resolve_redirect(http_client, chunk.web.uri)
+            resolved_url = await resolve_grounding_redirect(http_client, chunk.web.uri)
             if not resolved_url or "youtube.com/watch" not in resolved_url:
                 continue
             if resolved_url in seen_urls:
@@ -80,8 +80,28 @@ async def discover_videos(lesson: Lesson, max_results: int = 3) -> list[VideoRec
     return validated
 
 
+async def ask_about_video(video_url: str, lesson_title: str, question: str) -> str:
+    response = await generate_content(
+        model=GEMINI_MODEL_NAME,
+        contents=types.Content(
+            parts=[
+                types.Part(file_data=types.FileData(file_uri=video_url)),
+                types.Part(
+                    text=(
+                        f"This video is being watched alongside a lesson titled "
+                        f"'{lesson_title}'. Answer the viewer's question about the video "
+                        f"clearly and concisely, grounded in what's actually shown/said.\n\n"
+                        f"Question: {question}"
+                    )
+                ),
+            ]
+        ),
+    )
+    return response.text
+
+
 async def generate_video_notes(lesson_id: str, video_url: str, lesson_title: str) -> VideoNote:
-    response = await client.aio.models.generate_content(
+    response = await generate_content(
         model=GEMINI_MODEL_NAME,
         contents=types.Content(
             parts=[

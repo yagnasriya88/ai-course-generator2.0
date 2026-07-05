@@ -49,8 +49,12 @@ export function AuthProvider({ children }) {
     setStatus('anon')
   }, [])
 
+  const updateUser = useCallback((patch) => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev))
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, status, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, status, login, signup, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

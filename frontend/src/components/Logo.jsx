@@ -1,0 +1,12 @@
+function Logo({ className = 'h-8 w-8' }) {
+  return (
+    <svg viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className} aria-hidden="true">
+      <path d="m0 14.5264v18.9473l17.8947-12.2437v-18.94741z" fill="#9333ea" opacity=".5" />
+      <path d="m0 33.4737v-18.9474l17.8947 12.2438v18.9474z" fill="#2563eb" opacity=".5" />
+      <path d="m40 14.5263v18.9474l-17.8947-12.2438v-18.94737z" fill="#9333ea" opacity=".5" />
+      <path d="m40 33.4737v-18.9474l-17.8947 12.2438v18.9474z" fill="#2563eb" opacity=".5" />
+    </svg>
+  )
+}
+
+export default Logo

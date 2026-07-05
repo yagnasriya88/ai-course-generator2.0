@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import Lottie from './LottiePlayer'
 import { HelpCircle, Lock } from 'lucide-react'
 import { getModuleQuiz, submitModuleQuiz } from '../utils/api'
 import ErrorMessage from './ErrorMessage'
+import successCheckAnimation from '../assets/lottie/success-check.json'
+
+function QuizPassBanner() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="mb-4 flex items-center gap-2 rounded-xl bg-success-500/10 px-4 py-2.5 text-sm font-semibold text-success-600"
+    >
+      <Lottie animationData={successCheckAnimation} loop={false} className="h-8 w-8" />
+      Nice work — quiz passed!
+    </motion.div>
+  )
+}
 
 function QuestionInput({ question, value, onChange, disabled }) {
   if (question.type === 'mcq' || question.type === 'true_false') {
@@ -51,6 +67,7 @@ function QuizPanel({ courseId, module, allLessonsComplete, onResult }) {
   const [result, setResult] = useState(null)
   const [status, setStatus] = useState('idle') // idle | loading | submitting | error
   const [error, setError] = useState(null)
+  const [showPassBanner, setShowPassBanner] = useState(false)
 
   useEffect(() => {
     setQuiz(module.quiz ?? [])
@@ -86,6 +103,10 @@ function QuizPanel({ courseId, module, allLessonsComplete, onResult }) {
       setResult(res)
       setStatus('idle')
       onResult?.(res)
+      if (res.passed) {
+        setShowPassBanner(true)
+        setTimeout(() => setShowPassBanner(false), 2500)
+      }
     } catch (err) {
       setError(err.message)
       setStatus('error')
@@ -99,7 +120,7 @@ function QuizPanel({ courseId, module, allLessonsComplete, onResult }) {
 
   if (quiz.length === 0) {
     return (
-      <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
+      <section className="mt-4 rounded-2xl border border-white/60 bg-white/70 p-5 backdrop-blur-md shadow-glow">
         <div className="flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm font-medium text-slate-700">
             <HelpCircle className="h-4 w-4 text-primary-600" />
@@ -133,7 +154,8 @@ function QuizPanel({ courseId, module, allLessonsComplete, onResult }) {
       : null
 
   return (
-    <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="mt-4 rounded-2xl border border-white/60 bg-white/70 p-6 backdrop-blur-md shadow-glow">
+      <AnimatePresence>{showPassBanner && <QuizPassBanner />}</AnimatePresence>
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-2 font-display text-base font-semibold text-slate-900">
           <HelpCircle className="h-4 w-4 text-primary-600" />

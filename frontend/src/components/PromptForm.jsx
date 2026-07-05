@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Sparkles } from 'lucide-react'
 import { generateCourse } from '../utils/api'
+import { useJobs } from '../context/JobsContext'
 import ErrorMessage from './ErrorMessage'
 
 const AGENT_STEPS = [
@@ -9,41 +12,71 @@ const AGENT_STEPS = [
   'Assembling your course…',
 ]
 
+const EXAMPLE_TOPICS = [
+  'Prompt Engineering',
+  'Introduction to Python',
+  'React Hooks in depth',
+  'Public speaking basics',
+  'Personal finance 101',
+  'SQL for data analysis',
+]
+
 function PromptForm({ onGenerated }) {
   const [topic, setTopic] = useState('')
   const [level, setLevel] = useState('')
   const [goals, setGoals] = useState('')
   const [studyTime, setStudyTime] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [status, setStatus] = useState('idle') // idle | loading | error
-  const [error, setError] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
   const [stepIndex, setStepIndex] = useState(0)
+  const { activeJob, startTracking, stopTracking } = useJobs()
+  const navigate = useNavigate()
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!topic.trim() || status === 'loading') return
-    setStatus('loading')
-    setError(null)
-    setStepIndex(0)
+  const status =
+    activeJob?.status === 'queued' || activeJob?.status === 'processing' ? 'loading' : 'idle'
 
+  useEffect(() => {
+    if (status !== 'loading') return
     const interval = setInterval(() => {
       setStepIndex((i) => Math.min(i + 1, AGENT_STEPS.length - 1))
     }, 3500)
+    return () => clearInterval(interval)
+  }, [status])
 
+  useEffect(() => {
+    if (activeJob?.status === 'completed') {
+      const courseId = activeJob.course_id
+      stopTracking()
+      onGenerated({ _id: courseId })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeJob?.status])
+
+  async function submitJob() {
+    setSubmitError(null)
+    setStepIndex(0)
     try {
-      const course = await generateCourse({
+      const job = await generateCourse({
         topic,
         level: level || null,
         goals: goals || null,
         study_time: studyTime || null,
       })
-      onGenerated(course)
+      startTracking(job)
     } catch (err) {
-      setError(err.message)
-      setStatus('error')
-    } finally {
-      clearInterval(interval)
+      setSubmitError(err.message)
     }
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (!topic.trim() || status === 'loading') return
+    submitJob()
+  }
+
+  function handleRetry() {
+    stopTracking()
+    submitJob()
   }
 
   return (
@@ -65,6 +98,25 @@ function PromptForm({ onGenerated }) {
           Generate Course
         </button>
       </div>
+
+      {status === 'idle' && !topic && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1 text-xs text-slate-400">
+            <Sparkles className="h-3.5 w-3.5" />
+            Try:
+          </span>
+          {EXAMPLE_TOPICS.map((example) => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => setTopic(example)}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-primary-300 hover:text-primary-700"
+            >
+              {example}
+            </button>
+          ))}
+        </div>
+      )}
 
       <button
         type="button"
@@ -121,21 +173,35 @@ function PromptForm({ onGenerated }) {
           />
           <AnimatePresence mode="wait">
             <motion.p
-              key={stepIndex}
+              key={activeJob?.status === 'queued' ? 'queued' : stepIndex}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               className="text-sm"
             >
-              {AGENT_STEPS[stepIndex]}
+              {activeJob?.status === 'queued'
+                ? 'Queued — your course will start generating shortly…'
+                : AGENT_STEPS[stepIndex]}
             </motion.p>
           </AnimatePresence>
+          <p className="text-xs text-slate-400">
+            Feel free to navigate away — we&apos;ll keep working and let you know when it&apos;s ready.
+          </p>
         </div>
       )}
 
-      {status === 'error' && (
+      {submitError && (
         <div className="mt-6">
-          <ErrorMessage message={error} onRetry={handleSubmit} />
+          <ErrorMessage message={submitError} onRetry={handleSubmit} />
+        </div>
+      )}
+
+      {activeJob?.status === 'failed' && (
+        <div className="mt-6">
+          <ErrorMessage
+            message={activeJob.error || 'Course generation failed.'}
+            onRetry={handleRetry}
+          />
         </div>
       )}
     </form>

@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     mongo_uri: str = "mongodb://localhost:27017"
-    mongo_db_name: str = "text_to_learn"
+    mongo_db_name: str = "learnify_ai"
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
 
@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     openai_api_key: str = ""
     openai_model: str = "openai/gpt-4o-mini"
+
+    # Number of in-process asyncio workers polling the generation_jobs collection.
+    job_worker_concurrency: int = 2
 
     # Signs auth JWTs — change this in production; rotating it logs out all users.
     jwt_secret: str = "dev-insecure-secret-change-me"

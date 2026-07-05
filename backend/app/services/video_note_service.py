@@ -16,3 +16,11 @@ async def create_video_note(note: VideoNote) -> VideoNote:
     result = await db[COLLECTION].insert_one(doc)
     note.id = str(result.inserted_id)
     return note
+
+
+async def find_video_notes_by_lesson_ids(lesson_ids: list[str]) -> list[VideoNote]:
+    if not lesson_ids:
+        return []
+    db = get_database()
+    cursor = db[COLLECTION].find({"lesson_id": {"$in": lesson_ids}})
+    return [VideoNote(**doc) async for doc in cursor]

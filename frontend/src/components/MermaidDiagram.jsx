@@ -14,6 +14,7 @@ function MermaidDiagram({ code, onError }) {
         startOnLoad: false,
         theme: 'default',
         securityLevel: 'strict',
+        suppressErrorRendering: true,
       })
       initialized = true
     }
@@ -23,7 +24,7 @@ function MermaidDiagram({ code, onError }) {
     // of effects means a stable id causes two concurrent calls to collide on the same node.
     const renderId = `mermaid-${++renderCounter}`
     mermaid
-      .render(renderId, code)
+      .render(renderId, code, containerRef.current)
       .then(({ svg }) => {
         if (!cancelled && containerRef.current) containerRef.current.innerHTML = svg
       })

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.agents import quiz_agent
@@ -6,21 +7,62 @@ from app.agents.retry import with_retries
 from app.dependencies import get_current_user
 from app.models.course import Course, CourseGenerateRequest, ModuleOutline
 from app.models.user import User
-from app.services import course_service, generation_service, lesson_service
+from app.services import course_service, guardrail_service, job_service, lesson_service
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 
-@router.post("/generate")
+@router.post("/generate", status_code=status.HTTP_202_ACCEPTED)
 async def generate_course(
     request: CourseGenerateRequest, current_user: User = Depends(get_current_user)
 ):
-    return await generation_service.generate_course(request, owner_id=current_user.id)
+    """Validates the topic, then hands off to the persistent job queue instead of
+    generating inline — course generation can take a minute or more, and a plain
+    synchronous request would be lost if the user closed the tab or the request
+    timed out. Clients poll GET /courses/jobs/{job_id} for status."""
+    try:
+        await guardrail_service.run_guardrails(request)
+    except guardrail_service.TopicRejected as exc:
+        result = exc.result
+        message = f"{result.reason} {result.suggestion}".strip() if result.suggestion else result.reason
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": message,
+                "valid": False,
+                "reason": result.reason,
+                "suggestion": result.suggestion,
+            },
+        )
+
+    job, created = await job_service.create_job(owner_id=current_user.id, request=request)
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED if created else status.HTTP_200_OK,
+        content=job.model_dump(mode="json", by_alias=True),
+    )
+
+
+@router.get("/jobs")
+async def list_generation_jobs(current_user: User = Depends(get_current_user)):
+    return await job_service.list_jobs_for_user(owner_id=current_user.id)
+
+
+@router.get("/jobs/{job_id}")
+async def get_generation_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await job_service.get_job(job_id)
+    if not job or job.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.get("")
 async def list_courses(current_user: User = Depends(get_current_user)):
-    return await course_service.list_courses(owner_id=current_user.id)
+    return await course_service.list_courses_for_user(owner_id=current_user.id)
+
+
+@router.get("/quizzes")
+async def list_quizzes(current_user: User = Depends(get_current_user)):
+    return await course_service.list_quiz_summaries(owner_id=current_user.id)
 
 
 @router.get("/{course_id}")

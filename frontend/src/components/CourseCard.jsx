@@ -1,30 +1,58 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { BookOpen, Layers } from 'lucide-react'
+import { BookOpen, Layers, Sparkles } from 'lucide-react'
 import { fadeInUp } from '../utils/motion'
 import { coverGradient } from '../utils/coverGradient'
+import { moduleIllustration } from '../utils/moduleIllustration'
 import { courseProgress } from '../utils/progress'
 
 function CourseCard({ course }) {
   const gradient = coverGradient(course._id)
+  const CoverIllustration = moduleIllustration(course._id)
   const moduleCount = course.modules?.length ?? 0
   const { percent, lessonsCompleted, lessonsTotal } = courseProgress(course)
+  const [imageFailed, setImageFailed] = useState(false)
+  const showImage = course.cover_image_url && !imageFailed
 
   return (
     <motion.div variants={fadeInUp}>
       <Link
         to={`/course/${course._id}`}
-        className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-glow"
+        className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/70 backdrop-blur-md shadow-glow transition hover:-translate-y-0.5 hover:bg-white/80"
       >
         <div
-          className={`relative flex h-32 items-center justify-center bg-gradient-to-br ${gradient}`}
+          className={`relative flex h-32 items-center justify-center overflow-hidden ${
+            showImage ? '' : `bg-gradient-to-br ${gradient}`
+          }`}
         >
-          <span className="font-display text-4xl font-bold text-white/90">
-            {course.title?.[0]?.toUpperCase() ?? '?'}
-          </span>
+          {!showImage && (
+            <div
+              aria-hidden
+              className="absolute inset-0 opacity-20 [background-image:radial-gradient(white_1.5px,transparent_1.5px)] [background-size:16px_16px]"
+            />
+          )}
+          {showImage ? (
+            <img
+              src={course.cover_image_url}
+              alt=""
+              className="h-full w-full object-cover"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 p-2.5 shadow-sm">
+              <CoverIllustration className="h-full w-full" />
+            </span>
+          )}
           {course.level && (
             <span className="absolute top-3 right-3 rounded-full bg-white/90 px-2.5 py-0.5 text-xs font-semibold capitalize text-slate-700">
               {course.level}
+            </span>
+          )}
+          {course.is_platform && (
+            <span className="absolute top-3 left-3 flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-semibold text-primary-700">
+              <Sparkles className="h-3 w-3" />
+              Official
             </span>
           )}
         </div>

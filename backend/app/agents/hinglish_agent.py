@@ -9,7 +9,7 @@ from crewai import Agent, Crew, Task
 from google.genai import types
 from pydantic import BaseModel
 
-from app.agents.gemini_client import GEMINI_TTS_MODEL_NAME, client as genai_client, pcm_to_wav_base64
+from app.agents.gemini_client import GEMINI_TTS_MODEL_NAME, generate_content, pcm_to_wav_base64
 from app.agents.llm import get_llm
 from app.models.lesson import HinglishContent, Lesson
 
@@ -71,7 +71,7 @@ async def generate_hinglish_text(lesson: Lesson) -> str:
 
 async def synthesize_audio(text: str) -> str:
     """Returns base64-encoded WAV audio."""
-    response = await genai_client.aio.models.generate_content(
+    response = await generate_content(
         model=GEMINI_TTS_MODEL_NAME,
         contents=text,
         config=types.GenerateContentConfig(
