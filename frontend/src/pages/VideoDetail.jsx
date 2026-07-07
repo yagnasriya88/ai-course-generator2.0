@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
 import Skeleton from '../components/Skeleton'
 import PageBackground from '../components/PageBackground'
+import Markdown from '../components/Markdown'
 
 function VideoQA({ lessonId, videoUrl }) {
   const [messages, setMessages] = useState([])
@@ -63,7 +64,7 @@ function VideoQA({ lessonId, videoUrl }) {
                     : 'bg-slate-100 text-slate-700'
               }`}
             >
-              {m.text}
+              {m.role === 'user' ? m.text : <Markdown content={m.text} />}
             </div>
           ))}
           {pending && (

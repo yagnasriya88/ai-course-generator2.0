@@ -1,7 +1,12 @@
+import logging
+
+import jwt
 from fastapi import Header, HTTPException
 
 from app.models.user import User
-from app.services import auth_service, user_service
+from app.services import clerk_client, user_service
+
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user(authorization: str | None = Header(default=None)) -> User:
@@ -9,11 +14,10 @@ async def get_current_user(authorization: str | None = Header(default=None)) -> 
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     token = authorization.split(" ", 1)[1]
-    user_id = auth_service.decode_access_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    try:
+        clerk_user_id = clerk_client.verify_session_token(token)
+    except jwt.PyJWTError:
+        logger.warning("Rejected request with an invalid or expired Clerk session token")
+        raise HTTPException(status_code=401, detail="Invalid or expired session") from None
 
-    user = await user_service.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
+    return await user_service.get_or_create_from_clerk(clerk_user_id)

@@ -73,3 +73,45 @@ class VisualAidSchema(BaseModel):
 
 class VisualAidsSchema(BaseModel):
     aids: list[VisualAidSchema]
+
+
+class DiagramValidationSchema(BaseModel):
+    is_valid: bool
+    confidence: float = Field(description="0.0-1.0 confidence in this verdict")
+    reason: str = Field(description="Brief explanation of why the prompt was accepted or rejected")
+    suggestion: str | None = Field(
+        default=None, description="If invalid, a concrete rephrasing the user could try instead"
+    )
+    suggested_type: str | None = Field(
+        default=None,
+        description=(
+            "If the selected diagram type is not the best fit for the topic, one of: "
+            "mindmap, flowchart, roadmap, concept_map, process_diagram. Omit if the "
+            "selected type is already appropriate."
+        ),
+    )
+
+
+class RefinedPromptSchema(BaseModel):
+    refined_prompt: str = Field(
+        description="Expanded, descriptive version of the user's topic tailored for the diagram type"
+    )
+
+
+class GraphNodeSchema(BaseModel):
+    id: str = Field(description="Short stable identifier, e.g. 'n1', unique within the graph")
+    label: str
+    group: str | None = Field(default=None, description="Optional free-form category/cluster name")
+    description: str | None = None
+
+
+class GraphEdgeSchema(BaseModel):
+    source: str = Field(description="id of the source node")
+    target: str = Field(description="id of the target node")
+    label: str | None = None
+
+
+class DiagramGraphSchema(BaseModel):
+    title: str
+    nodes: list[GraphNodeSchema]
+    edges: list[GraphEdgeSchema]

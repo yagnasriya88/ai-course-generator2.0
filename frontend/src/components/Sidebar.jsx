@@ -10,7 +10,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PlusCircle,
+  Shapes,
   Sparkles,
+  Workflow,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
@@ -32,6 +34,13 @@ const NAV_GROUPS = [
   {
     label: 'Track',
     items: [{ to: '/jobs', label: 'Generation Jobs', icon: ListChecks }],
+  },
+  {
+    label: 'Canvas',
+    items: [
+      { to: '/canvas', label: 'Generate Diagrams', icon: Workflow },
+      { to: '/diagrams', label: 'My Diagrams', icon: Shapes },
+    ],
   },
 ]
 
@@ -110,9 +119,9 @@ function SidebarProfile({ collapsed }) {
   const xpToNext = user.xp_to_next ?? 500
   const progressPct = xp + xpToNext > 0 ? Math.min(100, Math.round((xp / (xp + xpToNext)) * 100)) : 0
 
-  function handleLogout() {
+  async function handleLogout() {
     setMenuOpen(false)
-    logout()
+    await logout()
     navigate('/login')
   }
 

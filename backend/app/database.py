@@ -32,3 +32,7 @@ async def ensure_indexes() -> None:
     await db["generation_jobs"].create_index([("owner_id", 1), ("created_at", -1)])
     await db["generation_jobs"].create_index([("owner_id", 1), ("dedupe_key", 1), ("status", 1)])
     await db["generation_jobs"].create_index("status")
+    await db["diagrams"].create_index([("owner_id", 1), ("updated_at", -1)])
+    await db["diagram_jobs"].create_index([("owner_id", 1), ("created_at", -1)])
+    await db["diagram_jobs"].create_index([("owner_id", 1), ("dedupe_key", 1), ("status", 1)])
+    await db["diagram_jobs"].create_index("status")

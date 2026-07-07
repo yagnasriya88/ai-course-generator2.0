@@ -1,60 +1,58 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import {
-  getAuthToken,
-  getMe,
-  login as apiLogin,
-  signup as apiSignup,
-  setAuthToken,
-} from '../utils/api'
+import { useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react'
+import { getMe, setTokenGetter } from '../utils/api'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const { isLoaded, isSignedIn, getToken, userId } = useClerkAuth()
+  const { signOut } = useClerk()
   const [user, setUser] = useState(null)
-  const [status, setStatus] = useState('loading') // loading | authed | anon
+  const [status, setStatus] = useState('loading') // loading | authed | anon | error
 
-  useEffect(() => {
-    if (!getAuthToken()) {
-      setStatus('anon')
-      return
-    }
+  const loadProfile = useCallback(() => {
+    setStatus('loading')
     getMe()
       .then((me) => {
         setUser(me)
         setStatus('authed')
       })
       .catch(() => {
-        setAuthToken(null)
-        setStatus('anon')
+        // Clerk still considers the user signed in — a failed profile fetch
+        // is a backend/network hiccup, not a logout, so don't bounce to /login.
+        setUser(null)
+        setStatus('error')
       })
   }, [])
 
-  const login = useCallback(async (email, password) => {
-    const { access_token, user: me } = await apiLogin({ email, password })
-    setAuthToken(access_token)
-    setUser(me)
-    setStatus('authed')
-  }, [])
+  useEffect(() => {
+    if (!isLoaded) return
 
-  const signup = useCallback(async (name, email, password) => {
-    const { access_token, user: me } = await apiSignup({ name, email, password })
-    setAuthToken(access_token)
-    setUser(me)
-    setStatus('authed')
-  }, [])
+    if (!isSignedIn) {
+      setTokenGetter(null)
+      setUser(null)
+      setStatus('anon')
+      return
+    }
 
-  const logout = useCallback(() => {
-    setAuthToken(null)
+    setTokenGetter(getToken)
+    loadProfile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn, userId])
+
+  const logout = useCallback(async () => {
+    await signOut()
+    setTokenGetter(null)
     setUser(null)
     setStatus('anon')
-  }, [])
+  }, [signOut])
 
   const updateUser = useCallback((patch) => {
     setUser((prev) => (prev ? { ...prev, ...patch } : prev))
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, status, login, signup, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, status, logout, updateUser, retry: loadProfile }}>
       {children}
     </AuthContext.Provider>
   )

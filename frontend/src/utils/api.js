@@ -1,21 +1,20 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const TOKEN_KEY = 'ttl_token'
 
-let authToken = localStorage.getItem(TOKEN_KEY)
+// Clerk session tokens expire in ~60s, so we can't cache one — this holds a
+// `getToken` function (from Clerk's useAuth()) that AuthContext wires up on
+// sign-in, and every request calls it fresh. Clerk's SDK internally caches
+// and silently refreshes the underlying token, so calling it per-request is
+// cheap.
+let tokenGetter = null
 
-export function setAuthToken(token) {
-  authToken = token
-  if (token) localStorage.setItem(TOKEN_KEY, token)
-  else localStorage.removeItem(TOKEN_KEY)
-}
-
-export function getAuthToken() {
-  return authToken
+export function setTokenGetter(fn) {
+  tokenGetter = fn
 }
 
 async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers }
-  if (authToken) headers.Authorization = `Bearer ${authToken}`
+  const token = tokenGetter ? await tokenGetter() : null
+  if (token) headers.Authorization = `Bearer ${token}`
 
   const res = await fetch(`${API_BASE_URL}/api${path}`, {
     ...options,
@@ -29,18 +28,18 @@ async function request(path, options = {}) {
         : body?.detail
           ? JSON.stringify(body.detail)
           : `Request failed: ${res.status} ${res.statusText}`
-    throw new Error(message)
+    const error = new Error(message)
+    // Attaches the raw error body (e.g. guardrail rejections' reason/suggestion/
+    // suggested_type) for callers that need more than the flattened message —
+    // existing catch blocks that only read err.message are unaffected.
+    error.body = body
+    throw error
   }
   return res.status === 204 ? null : res.json()
 }
 
-// Auth
-export const signup = (payload) =>
-  request('/auth/signup', { method: 'POST', body: JSON.stringify(payload) })
-
-export const login = (payload) =>
-  request('/auth/login', { method: 'POST', body: JSON.stringify(payload) })
-
+// Auth — sign-in/sign-up itself is handled by Clerk; this just resolves the
+// authenticated Clerk session to (or creates) our own user profile.
 export const getMe = () => request('/auth/me')
 
 export const exportMyData = () => request('/auth/me/export')
@@ -110,6 +109,33 @@ export const setLessonCompleted = (lessonId, completed) =>
   request(`/lessons/${lessonId}/complete`, {
     method: 'POST',
     body: JSON.stringify({ completed }),
+  })
+
+// Knowledge Canvas — diagram generation runs on the same style of persistent
+// job queue as course generation; enqueue-then-poll instead of waiting inline.
+export const generateDiagram = (payload) =>
+  request('/diagrams/generate', { method: 'POST', body: JSON.stringify(payload) })
+
+export const getDiagramJob = (jobId) => request(`/diagrams/jobs/${jobId}`)
+
+export const listDiagramJobs = () => request('/diagrams/jobs')
+
+export const listDiagrams = () => request('/diagrams')
+
+export const getDiagram = (diagramId) => request(`/diagrams/${diagramId}`)
+
+export const updateDiagram = (diagramId, payload) =>
+  request(`/diagrams/${diagramId}`, { method: 'PATCH', body: JSON.stringify(payload) })
+
+export const deleteDiagram = (diagramId) => request(`/diagrams/${diagramId}`, { method: 'DELETE' })
+
+export const duplicateDiagram = (diagramId) =>
+  request(`/diagrams/${diagramId}/duplicate`, { method: 'POST' })
+
+export const aiEditDiagram = (diagramId, instruction) =>
+  request(`/diagrams/${diagramId}/ai-edit`, {
+    method: 'POST',
+    body: JSON.stringify({ instruction }),
   })
 
 export { API_BASE_URL, request }

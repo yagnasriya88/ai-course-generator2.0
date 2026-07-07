@@ -22,9 +22,9 @@ function AccountMenu() {
 
   if (!user) return null
 
-  function handleLogout() {
+  async function handleLogout() {
     setOpen(false)
-    logout()
+    await logout()
     navigate('/login')
   }
 

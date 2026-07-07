@@ -1,38 +1,22 @@
-import re
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.common import PyObjectId
-
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-class UserSignupRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    email: str
-    password: str = Field(min_length=8, max_length=128)
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, value: str) -> str:
-        if not EMAIL_RE.match(value):
-            raise ValueError("Enter a valid email address")
-        return value.lower()
-
-
-class UserLoginRequest(BaseModel):
-    email: str
-    password: str
 
 
 class User(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    # For Clerk-native users this is the Clerk user id (e.g. "user_2abc..."),
+    # stored directly as Mongo's _id — not a real ObjectId. PyObjectId just
+    # coerces to str, so it accepts either.
     id: PyObjectId | None = Field(default=None, alias="_id")
     name: str
     email: str
-    password_hash: str
+    # Only ever set on pre-Clerk accounts; Clerk owns authentication now, so
+    # nothing writes this field anymore.
+    password_hash: str | None = None
     xp: int = 0
     gold: int = 0
     current_streak: int = 0

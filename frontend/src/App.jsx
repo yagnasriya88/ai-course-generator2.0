@@ -10,6 +10,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 // page's dependencies are only fetched once someone actually navigates there.
 const Login = lazy(() => import('./pages/Login'))
 const Signup = lazy(() => import('./pages/Signup'))
+const SsoCallback = lazy(() => import('./pages/SsoCallback'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const CreateCourse = lazy(() => import('./pages/CreateCourse'))
 const CourseList = lazy(() => import('./pages/CourseList'))
@@ -17,6 +18,10 @@ const Course = lazy(() => import('./pages/Course'))
 const Lesson = lazy(() => import('./pages/Lesson'))
 const VideoDetail = lazy(() => import('./pages/VideoDetail'))
 const GenerationJobs = lazy(() => import('./pages/GenerationJobs'))
+const KnowledgeCanvas = lazy(() => import('./pages/KnowledgeCanvas'))
+const GenerateDiagram = lazy(() => import('./pages/GenerateDiagram'))
+const DiagramList = lazy(() => import('./pages/DiagramList'))
+const DiagramEditor = lazy(() => import('./pages/DiagramEditor'))
 
 function RouteFallback() {
   return (
@@ -32,6 +37,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/sso-callback" element={<SsoCallback />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
@@ -44,6 +50,10 @@ function App() {
               path="/course/:courseId/lesson/:lessonId/video/:videoIndex"
               element={<VideoDetail />}
             />
+            <Route path="/canvas" element={<KnowledgeCanvas />} />
+            <Route path="/canvas/:diagramType" element={<GenerateDiagram />} />
+            <Route path="/diagrams" element={<DiagramList />} />
+            <Route path="/diagram/:diagramId" element={<DiagramEditor />} />
           </Route>
         </Route>
       </Routes>
