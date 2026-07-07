@@ -17,7 +17,6 @@ const CourseList = lazy(() => import('./pages/CourseList'))
 const Course = lazy(() => import('./pages/Course'))
 const Lesson = lazy(() => import('./pages/Lesson'))
 const VideoDetail = lazy(() => import('./pages/VideoDetail'))
-const GenerationJobs = lazy(() => import('./pages/GenerationJobs'))
 const KnowledgeCanvas = lazy(() => import('./pages/KnowledgeCanvas'))
 const GenerateDiagram = lazy(() => import('./pages/GenerateDiagram'))
 const DiagramList = lazy(() => import('./pages/DiagramList'))
@@ -42,7 +41,6 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/create" element={<CreateCourse />} />
-            <Route path="/jobs" element={<GenerationJobs />} />
             <Route path="/courses" element={<CourseList />} />
             <Route path="/course/:courseId" element={<Course />} />
             <Route path="/course/:courseId/lesson/:lessonId" element={<Lesson />} />

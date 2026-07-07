@@ -53,8 +53,6 @@ export const generateCourse = (payload) =>
 
 export const getGenerationJob = (jobId) => request(`/courses/jobs/${jobId}`)
 
-export const listGenerationJobs = () => request('/courses/jobs')
-
 export const listCourses = () => request('/courses')
 
 export const getDashboard = () => request('/dashboard')

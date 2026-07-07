@@ -29,11 +29,14 @@ function PromptForm({ onGenerated }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   const [stepIndex, setStepIndex] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
   const { activeJob, startTracking, stopTracking } = useJobs()
   const navigate = useNavigate()
 
   const status =
-    activeJob?.status === 'queued' || activeJob?.status === 'processing' ? 'loading' : 'idle'
+    submitting || activeJob?.status === 'queued' || activeJob?.status === 'processing'
+      ? 'loading'
+      : 'idle'
 
   useEffect(() => {
     if (status !== 'loading') return
@@ -65,17 +68,21 @@ function PromptForm({ onGenerated }) {
       startTracking(job)
     } catch (err) {
       setSubmitError(err.message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!topic.trim() || status === 'loading') return
+    setSubmitting(true)
     submitJob()
   }
 
   function handleRetry() {
     stopTracking()
+    setSubmitting(true)
     submitJob()
   }
 

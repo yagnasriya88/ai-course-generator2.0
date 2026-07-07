@@ -27,8 +27,12 @@ function GenerateDiagram() {
   const [submitError, setSubmitError] = useState(null)
   const [rejection, setRejection] = useState(null)
   const [stepIndex, setStepIndex] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
 
-  const status = activeJob?.status === 'queued' || activeJob?.status === 'processing' ? 'loading' : 'idle'
+  const status =
+    submitting || activeJob?.status === 'queued' || activeJob?.status === 'processing'
+      ? 'loading'
+      : 'idle'
 
   useEffect(() => {
     if (status !== 'loading') return
@@ -64,17 +68,21 @@ function GenerateDiagram() {
       } else {
         setSubmitError(err.message)
       }
+    } finally {
+      setSubmitting(false)
     }
   }
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!topic.trim() || status === 'loading') return
+    setSubmitting(true)
     submitJob()
   }
 
   function handleRetry() {
     stopTracking()
+    setSubmitting(true)
     submitJob()
   }
 

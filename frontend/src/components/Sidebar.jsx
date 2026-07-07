@@ -5,7 +5,6 @@ import {
   BookOpen,
   Download,
   LayoutDashboard,
-  ListChecks,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -30,10 +29,6 @@ const NAV_GROUPS = [
   {
     label: 'Create',
     items: [{ to: '/create', label: 'New Course', icon: PlusCircle }],
-  },
-  {
-    label: 'Track',
-    items: [{ to: '/jobs', label: 'Generation Jobs', icon: ListChecks }],
   },
   {
     label: 'Canvas',
