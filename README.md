@@ -31,7 +31,8 @@ Email: demo@learnify.ai
 Password: demo1234
 ---
 
-## 🏛️ Architecture
+## 🏛️ Architecture 
+
 
 ```mermaid
 flowchart TD

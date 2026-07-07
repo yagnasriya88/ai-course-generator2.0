@@ -98,8 +98,8 @@ async def _migrate_legacy_user(legacy: User, clerk_user_id: str, profile: dict) 
     doc["_id"] = clerk_user_id
     doc["name"] = profile.get("name") or legacy.name
     doc["email"] = profile.get("email") or legacy.email
-    await db[COLLECTION].insert_one(doc)
     await db[COLLECTION].delete_one({"_id": ObjectId(old_id)})
+    await db[COLLECTION].insert_one(doc)
 
     for collection, field in _OWNED_COLLECTIONS:
         await db[collection].update_many({field: old_id}, {"$set": {field: clerk_user_id}})
