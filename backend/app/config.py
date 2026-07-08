@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     mongo_uri: str = "mongodb://localhost:27017"
     mongo_db_name: str = "learnify_ai"
+    mongo_max_pool_size: int = 50
+    mongo_min_pool_size: int = 5
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
 
@@ -24,8 +26,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "openai/gpt-4o-mini"
 
-    # Number of in-process asyncio workers polling the generation_jobs collection.
+    # Number of in-process asyncio workers polling each job queue. Separate
+    # settings since course-gen and diagram-gen have different LLM-call
+    # profiles — lets an operator tune one queue's throughput without
+    # changing the other's exposure to the same rate-limited provider.
     job_worker_concurrency: int = 2
+    diagram_worker_concurrency: int = 2
 
     # Clerk handles all authentication (Google sign-in/up, session issuance) —
     # the secret key calls Clerk's Backend API, the publishable key's embedded

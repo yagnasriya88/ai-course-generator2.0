@@ -7,7 +7,13 @@ _client: AsyncIOMotorClient | None = None
 
 def connect_to_mongo() -> None:
     global _client
-    _client = AsyncIOMotorClient(settings.mongo_uri)
+    _client = AsyncIOMotorClient(
+        settings.mongo_uri,
+        maxPoolSize=settings.mongo_max_pool_size,
+        minPoolSize=settings.mongo_min_pool_size,
+        connectTimeoutMS=10_000,
+        serverSelectionTimeoutMS=10_000,
+    )
 
 
 def close_mongo_connection() -> None:

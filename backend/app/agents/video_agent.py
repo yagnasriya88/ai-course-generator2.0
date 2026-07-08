@@ -11,9 +11,19 @@ import json
 import httpx
 from google.genai import types
 
-from app.agents.gemini_client import GEMINI_MODEL_NAME, generate_content, strip_json_fences
+import asyncio
+from typing import AsyncIterator
+
+from app.agents.gemini_client import GEMINI_MODEL_NAME, _client_for, generate_content, strip_json_fences
+from app.agents.gemini_keys import key_manager
 from app.models.lesson import Lesson, VideoRecommendation
 from app.models.video_note import TimestampNote, VideoNote
+from app.services.cache import AsyncTTLCache, cache_key
+
+# Grounded search results for a given lesson topic don't meaningfully change
+# minute-to-minute — cache to avoid repeating a search-grounding call plus
+# several oEmbed/redirect HTTP round-trips for duplicate/retried topics.
+_discovery_cache = AsyncTTLCache(maxsize=256, ttl=24 * 60 * 60)
 
 
 async def resolve_grounding_redirect(http_client: httpx.AsyncClient, grounding_url: str) -> str | None:
@@ -40,10 +50,29 @@ async def _oembed_title(http_client: httpx.AsyncClient, video_url: str) -> str |
         return None
 
 
+async def _resolve_chunk(
+    http_client: httpx.AsyncClient, chunk, lesson_title: str
+) -> tuple[str, VideoRecommendation] | None:
+    if not chunk.web or not chunk.web.uri:
+        return None
+    resolved_url = await resolve_grounding_redirect(http_client, chunk.web.uri)
+    if not resolved_url or "youtube.com/watch" not in resolved_url:
+        return None
+    title = await _oembed_title(http_client, resolved_url)
+    if title is None:
+        return None
+    return resolved_url, VideoRecommendation(title=title, url=resolved_url, query=lesson_title)
+
+
 async def discover_videos(lesson: Lesson, max_results: int = 3) -> list[VideoRecommendation]:
     """The model's own JSON output can name a plausible-but-hallucinated video
     ID even with grounding enabled — only `grounding_metadata.grounding_chunks`
     (the actual search citations) are trustworthy for the URL itself."""
+    key = cache_key(lesson.title, str(max_results))
+    cached = _discovery_cache.get(key)
+    if cached is not None:
+        return cached
+
     response = await generate_content(
         model=GEMINI_MODEL_NAME,
         contents=(
@@ -57,26 +86,26 @@ async def discover_videos(lesson: Lesson, max_results: int = 3) -> list[VideoRec
     grounding_metadata = response.candidates[0].grounding_metadata
     chunks = grounding_metadata.grounding_chunks if grounding_metadata else None
 
+    async with httpx.AsyncClient(timeout=5.0) as http_client:
+        results = await asyncio.gather(
+            *(_resolve_chunk(http_client, chunk, lesson.title) for chunk in chunks or []),
+            return_exceptions=True,
+        )
+
     validated: list[VideoRecommendation] = []
     seen_urls: set[str] = set()
+    for result in results:
+        if isinstance(result, BaseException) or result is None:
+            continue
+        resolved_url, recommendation = result
+        if resolved_url in seen_urls:
+            continue
+        seen_urls.add(resolved_url)
+        validated.append(recommendation)
+        if len(validated) >= max_results:
+            break
 
-    async with httpx.AsyncClient(timeout=5.0) as http_client:
-        for chunk in chunks or []:
-            if len(validated) >= max_results:
-                break
-            if not chunk.web or not chunk.web.uri:
-                continue
-            resolved_url = await resolve_grounding_redirect(http_client, chunk.web.uri)
-            if not resolved_url or "youtube.com/watch" not in resolved_url:
-                continue
-            if resolved_url in seen_urls:
-                continue
-            seen_urls.add(resolved_url)
-            title = await _oembed_title(http_client, resolved_url)
-            if title is None:
-                continue
-            validated.append(VideoRecommendation(title=title, url=resolved_url, query=lesson.title))
-
+    _discovery_cache.set(key, validated)
     return validated
 
 
@@ -98,6 +127,32 @@ async def ask_about_video(video_url: str, lesson_title: str, question: str) -> s
         ),
     )
     return response.text
+
+
+async def stream_about_video(video_url: str, lesson_title: str, question: str) -> AsyncIterator[str]:
+    """Gemini-only (native YouTube file understanding has no OpenAI equivalent) —
+    streams directly via generate_content_stream instead of the buffered
+    generate_content() ask_about_video uses."""
+    client = _client_for(key_manager.current_key())
+    stream = await client.aio.models.generate_content_stream(
+        model=GEMINI_MODEL_NAME,
+        contents=types.Content(
+            parts=[
+                types.Part(file_data=types.FileData(file_uri=video_url)),
+                types.Part(
+                    text=(
+                        f"This video is being watched alongside a lesson titled "
+                        f"'{lesson_title}'. Answer the viewer's question about the video "
+                        f"clearly and concisely, grounded in what's actually shown/said.\n\n"
+                        f"Question: {question}"
+                    )
+                ),
+            ]
+        ),
+    )
+    async for chunk in stream:
+        if chunk.text:
+            yield chunk.text
 
 
 async def generate_video_notes(lesson_id: str, video_url: str, lesson_title: str) -> VideoNote:

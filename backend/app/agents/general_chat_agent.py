@@ -1,6 +1,15 @@
+from typing import AsyncIterator
+
 from crewai import Agent, Crew, Task
 
 from app.agents.llm import get_llm
+from app.agents.streaming import stream_chat_completion
+
+_GENERAL_CHAT_SYSTEM_PROMPT = (
+    "You are a friendly, knowledgeable learning assistant available anywhere in the app — "
+    "not grounded in any specific lesson. Give clear, accurate, encouraging answers, and say "
+    "so when a question needs more context than you have."
+)
 
 
 def build_general_chat_agent() -> Agent:
@@ -31,3 +40,10 @@ async def ask_general(question: str) -> str:
     crew = Crew(agents=[agent], tasks=[task], verbose=False)
     result = await crew.kickoff_async()
     return str(result)
+
+
+async def stream_general_answer(question: str) -> AsyncIterator[str]:
+    """Same prompt shape as ask_general, but calls the LLM directly instead of
+    going through CrewAI's Agent/Crew, which can't stream."""
+    async for delta in stream_chat_completion(_GENERAL_CHAT_SYSTEM_PROMPT, question, temperature=0.6):
+        yield delta

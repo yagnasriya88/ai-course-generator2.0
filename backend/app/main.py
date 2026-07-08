@@ -13,6 +13,7 @@ if sys.platform == "win32":
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
@@ -37,7 +38,7 @@ async def lifespan(app: FastAPI):
     await job_service.requeue_stale_processing_jobs()
     job_worker.start_workers(settings.job_worker_concurrency)
     await diagram_job_service.requeue_stale_processing_jobs()
-    diagram_worker.start_workers(settings.job_worker_concurrency)
+    diagram_worker.start_workers(settings.diagram_worker_concurrency)
     yield
     await job_worker.stop_workers()
     await diagram_worker.stop_workers()
@@ -81,6 +82,10 @@ class LogRequestsMiddleware:
 
 
 app.add_middleware(LogRequestsMiddleware)
+# Compresses response bodies (course/lesson JSON can be sizeable with full
+# content + visual aids + video lists) — added after LogRequestsMiddleware so
+# it wraps outside it, compressing the final body.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.exception_handler(RequestValidationError)

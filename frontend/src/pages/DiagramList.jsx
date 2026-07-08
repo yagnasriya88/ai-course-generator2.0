@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Search, X } from 'lucide-react'
@@ -37,14 +37,17 @@ function DiagramList() {
   const [sortBy, setSortBy] = useState('newest')
   const { fadeInUp, staggerContainer } = usePageMotion()
 
-  const filtered = diagrams?.filter((d) => !typeFilter || d.diagram_type === typeFilter)
-  const searched = filtered
-    ?.filter((d) => !query.trim() || d.title.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) =>
-      sortBy === 'alphabetical'
-        ? a.title.localeCompare(b.title)
-        : new Date(b.updated_at) - new Date(a.updated_at)
-    )
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return diagrams
+      ?.filter((d) => !typeFilter || d.diagram_type === typeFilter)
+      .filter((d) => !q || d.title.toLowerCase().includes(q))
+      .sort((a, b) =>
+        sortBy === 'alphabetical'
+          ? a.title.localeCompare(b.title)
+          : new Date(b.updated_at) - new Date(a.updated_at)
+      )
+  }, [diagrams, typeFilter, query, sortBy])
   const hasQuery = query.trim() !== ''
 
   function patchLocal(id, patch) {

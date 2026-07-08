@@ -7,12 +7,18 @@ from pymongo import ReturnDocument
 from app.database import get_database
 from app.models.user import User
 from app.services import clerk_client
+from app.services.cache import AsyncTTLCache
 
 logger = logging.getLogger(__name__)
 
 COLLECTION = "users"
 LESSON_COMPLETE_XP = 50
 LESSON_COMPLETE_GOLD = 10
+
+# get_current_user resolves on nearly every authenticated request (two DB
+# round-trips: find user, bump streak) — short TTL keeps auth-resolution fast
+# without meaningfully risking stale xp/gold/streak being served.
+_user_cache = AsyncTTLCache(maxsize=1024, ttl=30)
 
 # Collections that scope data to a user id — cascaded when a legacy account is
 # re-keyed onto its Clerk identity (see _migrate_legacy_user).
@@ -46,6 +52,7 @@ async def award_rewards(user_id: str, xp_delta: int, gold_delta: int) -> User | 
         doc["xp"] = max(doc["xp"], 0)
         doc["gold"] = max(doc["gold"], 0)
         await db[COLLECTION].update_one({"_id": user_id}, {"$set": {"xp": doc["xp"], "gold": doc["gold"]}})
+    _user_cache.pop(user_id)
     return User(**doc)
 
 
@@ -122,17 +129,29 @@ async def get_or_create_from_clerk(clerk_user_id: str) -> User:
     """Resolves the authenticated Clerk user to a local profile: reuses it if
     one already exists under this Clerk id, adopts a matching pre-Clerk
     account by email (see _migrate_legacy_user), or creates a fresh one —
-    then bumps the daily streak exactly like every previous auth response did."""
+    then bumps the daily streak exactly like every previous auth response did.
+
+    Runs on nearly every authenticated request, so the resolved user is
+    cached briefly (see _user_cache) to save the find+streak-bump round-trips
+    on repeat requests within the window; award_rewards() invalidates the
+    entry immediately on xp/gold change so completions stay visible."""
+    cached = _user_cache.get(clerk_user_id)
+    if cached is not None:
+        return cached
+
     existing = await get_user_by_id(clerk_user_id)
     if existing:
-        return await bump_streak(existing.id) or existing
-
-    profile = await clerk_client.fetch_clerk_profile(clerk_user_id)
-    legacy = await get_user_by_email(profile["email"]) if profile["email"] else None
-
-    if legacy and legacy.id != clerk_user_id:
-        user = await _migrate_legacy_user(legacy, clerk_user_id, profile)
+        user = await bump_streak(existing.id) or existing
     else:
-        user = await _create_clerk_user(clerk_user_id, profile)
+        profile = await clerk_client.fetch_clerk_profile(clerk_user_id)
+        legacy = await get_user_by_email(profile["email"]) if profile["email"] else None
 
-    return await bump_streak(user.id) or user
+        if legacy and legacy.id != clerk_user_id:
+            user = await _migrate_legacy_user(legacy, clerk_user_id, profile)
+        else:
+            user = await _create_clerk_user(clerk_user_id, profile)
+
+        user = await bump_streak(user.id) or user
+
+    _user_cache.set(clerk_user_id, user)
+    return user

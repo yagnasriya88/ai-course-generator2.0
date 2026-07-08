@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { askTutor } from '../utils/api'
+import { askTutorStream } from '../utils/api'
 import ChatPanelShell from './chat/ChatPanelShell'
 
 function AITutorPanel({ lessonId, open, onClose }) {
@@ -14,14 +14,35 @@ function AITutorPanel({ lessonId, open, onClose }) {
     setQuestion('')
     setMessages((m) => [...m, { role: 'user', text: q }])
     setPending(true)
-    try {
-      const { answer } = await askTutor(lessonId, q)
-      setMessages((m) => [...m, { role: 'tutor', text: answer }])
-    } catch (err) {
-      setMessages((m) => [...m, { role: 'tutor', text: `Sorry — ${err.message}`, isError: true }])
-    } finally {
-      setPending(false)
-    }
+
+    await askTutorStream(lessonId, q, {
+      onDelta: (delta) => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          if (last?.role === 'tutor' && last?.streaming) {
+            return [...m.slice(0, -1), { ...last, text: last.text + delta }]
+          }
+          return [...m, { role: 'tutor', text: delta, streaming: true }]
+        })
+      },
+      onDone: () => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          if (last?.role !== 'tutor') return m
+          return [...m.slice(0, -1), { ...last, streaming: false }]
+        })
+        setPending(false)
+      },
+      onError: (message) => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          const errorMsg = { role: 'tutor', text: `Sorry — ${message}`, isError: true, streaming: false }
+          if (last?.role === 'tutor' && last?.streaming) return [...m.slice(0, -1), errorMsg]
+          return [...m, errorMsg]
+        })
+        setPending(false)
+      },
+    })
   }
 
   return (

@@ -1,3 +1,5 @@
+import Markdown from '../Markdown'
+
 function ChatBubble({ role, text, isError }) {
   return (
     <div
@@ -9,7 +11,7 @@ function ChatBubble({ role, text, isError }) {
             : 'bg-slate-100 text-slate-700'
       }`}
     >
-      {text}
+      {role === 'user' ? text : <Markdown content={text} />}
     </div>
   )
 }

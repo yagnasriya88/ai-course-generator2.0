@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, MessageCircle, Send, Sparkles } from 'lucide-react'
-import { askAboutVideo, getLesson, getVideoNotes } from '../utils/api'
+import { askAboutVideoStream, getLesson, getVideoNotes } from '../utils/api'
 import useFetch from '../hooks/useFetch'
 import { getYoutubeEmbedUrl } from '../utils/youtube'
 import VideoNotes from '../components/VideoNotes'
@@ -29,14 +29,35 @@ function VideoQA({ lessonId, videoUrl }) {
     setQuestion('')
     setMessages((m) => [...m, { role: 'user', text: q }])
     setPending(true)
-    try {
-      const { answer } = await askAboutVideo(lessonId, videoUrl, q)
-      setMessages((m) => [...m, { role: 'answer', text: answer }])
-    } catch (err) {
-      setMessages((m) => [...m, { role: 'answer', text: `Sorry — ${err.message}`, isError: true }])
-    } finally {
-      setPending(false)
-    }
+
+    await askAboutVideoStream(lessonId, videoUrl, q, {
+      onDelta: (delta) => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          if (last?.role === 'answer' && last?.streaming) {
+            return [...m.slice(0, -1), { ...last, text: last.text + delta }]
+          }
+          return [...m, { role: 'answer', text: delta, streaming: true }]
+        })
+      },
+      onDone: () => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          if (last?.role !== 'answer') return m
+          return [...m.slice(0, -1), { ...last, streaming: false }]
+        })
+        setPending(false)
+      },
+      onError: (message) => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          const errorMsg = { role: 'answer', text: `Sorry — ${message}`, isError: true, streaming: false }
+          if (last?.role === 'answer' && last?.streaming) return [...m.slice(0, -1), errorMsg]
+          return [...m, errorMsg]
+        })
+        setPending(false)
+      },
+    })
   }
 
   return (
@@ -67,7 +88,7 @@ function VideoQA({ lessonId, videoUrl }) {
               {m.role === 'user' ? m.text : <Markdown content={m.text} />}
             </div>
           ))}
-          {pending && (
+          {pending && messages[messages.length - 1]?.role !== 'answer' && (
             <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-sm">
               {[0, 1, 2].map((i) => (
                 <motion.span

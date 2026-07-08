@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
-import { askGeneralChat } from '../utils/api'
+import { askGeneralChatStream } from '../utils/api'
 import { useUI } from '../context/UIContext'
 import ChatPanelShell from './chat/ChatPanelShell'
 
@@ -19,17 +19,35 @@ function GlobalChatPanel() {
     setQuestion('')
     setMessages((m) => [...m, { role: 'user', text: q }])
     setPending(true)
-    try {
-      const { answer } = await askGeneralChat(q)
-      setMessages((m) => [...m, { role: 'assistant', text: answer }])
-    } catch (err) {
-      setMessages((m) => [
-        ...m,
-        { role: 'assistant', text: `Sorry — ${err.message}`, isError: true },
-      ])
-    } finally {
-      setPending(false)
-    }
+
+    await askGeneralChatStream(q, {
+      onDelta: (delta) => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          if (last?.role === 'assistant' && last?.streaming) {
+            return [...m.slice(0, -1), { ...last, text: last.text + delta }]
+          }
+          return [...m, { role: 'assistant', text: delta, streaming: true }]
+        })
+      },
+      onDone: () => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          if (last?.role !== 'assistant') return m
+          return [...m.slice(0, -1), { ...last, streaming: false }]
+        })
+        setPending(false)
+      },
+      onError: (message) => {
+        setMessages((m) => {
+          const last = m[m.length - 1]
+          const errorMsg = { role: 'assistant', text: `Sorry — ${message}`, isError: true, streaming: false }
+          if (last?.role === 'assistant' && last?.streaming) return [...m.slice(0, -1), errorMsg]
+          return [...m, errorMsg]
+        })
+        setPending(false)
+      },
+    })
   }
 
   return (

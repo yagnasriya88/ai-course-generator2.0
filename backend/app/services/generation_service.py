@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -45,14 +46,29 @@ async def generate_course(
     )
 
     module_titles = [m.title for m in outline.modules]
-    module_results = await with_retries(
-        generate_all_modules_concurrently,
-        outline.title,
-        outline.description,
-        module_titles,
-        request.level,
-        request.goals,
+    # Cover-image discovery only depends on the outline's title/description,
+    # not on lesson content — run it concurrently with module generation
+    # instead of after, so it overlaps with the longest step in the pipeline
+    # rather than adding its own latency on top.
+    module_results, cover_image_result = await asyncio.gather(
+        with_retries(
+            generate_all_modules_concurrently,
+            outline.title,
+            outline.description,
+            module_titles,
+            request.level,
+            request.goals,
+        ),
+        image_agent.discover_topic_image(outline.title, outline.description),
+        return_exceptions=True,
     )
+    if isinstance(module_results, BaseException):
+        raise module_results
+    if isinstance(cover_image_result, BaseException):
+        logger.warning("Cover image discovery failed for %r", outline.title, exc_info=cover_image_result)
+        cover_image_url = None
+    else:
+        cover_image_url = cover_image_result
     logger.info(
         "%d modules generated concurrently after %.1fs total",
         len(module_results),
@@ -85,12 +101,6 @@ async def generate_course(
 
         modules.append(ModuleOutline(id=module_id, title=module_title, lessons=lesson_stubs))
 
-    try:
-        cover_image_url = await image_agent.discover_topic_image(outline.title, outline.description)
-    except Exception:
-        logger.warning("Cover image discovery failed for %r", outline.title, exc_info=True)
-        cover_image_url = None
-
     course = Course(
         owner_id=owner_id,
         title=outline.title,
@@ -108,7 +118,7 @@ async def generate_course(
 
     for lesson in lessons_to_save:
         lesson.course_id = saved_course.id
-        await lesson_service.create_lesson(lesson)
+    await lesson_service.create_lessons_bulk(lessons_to_save)
 
     logger.info(
         "Course generation complete: id=%s %d lessons in %.1fs",

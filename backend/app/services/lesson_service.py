@@ -19,6 +19,25 @@ async def create_lesson(lesson: Lesson) -> Lesson:
     return lesson
 
 
+async def create_lessons_bulk(lessons: list[Lesson]) -> list[Lesson]:
+    """Same _id-preservation contract as create_lesson, but issues one
+    insert_many instead of N sequential round-trips — used by course
+    generation, which creates every module's lessons in one batch."""
+    if not lessons:
+        return lessons
+    db = get_database()
+    docs = []
+    for lesson in lessons:
+        doc = lesson.model_dump(by_alias=True, exclude={"id"})
+        if lesson.id:
+            doc["_id"] = ObjectId(lesson.id)
+        docs.append(doc)
+    result = await db[COLLECTION].insert_many(docs)
+    for lesson, inserted_id in zip(lessons, result.inserted_ids):
+        lesson.id = str(inserted_id)
+    return lessons
+
+
 async def get_lesson(lesson_id: str) -> Lesson | None:
     try:
         object_id = ObjectId(lesson_id)

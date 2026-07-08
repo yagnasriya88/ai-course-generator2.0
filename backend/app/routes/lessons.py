@@ -1,4 +1,7 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.agents import hinglish_agent, tutor_agent, video_agent, visual_agent
@@ -86,6 +89,25 @@ async def ask_about_video(
     return {"answer": answer}
 
 
+@router.post("/{lesson_id}/videos/ask/stream")
+async def ask_about_video_stream(
+    lesson_id: str, body: VideoQuestion, current_user: User = Depends(get_current_user)
+):
+    lesson = await _require_lesson(lesson_id, current_user)
+
+    async def event_gen():
+        try:
+            async for delta in video_agent.stream_about_video(
+                body.video_url, lesson.title, body.question
+            ):
+                yield f"data: {json.dumps({'delta': delta})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
 class LessonCompletion(BaseModel):
     completed: bool
 
@@ -138,6 +160,8 @@ async def set_lesson_completed(
 @router.post("/{lesson_id}/hinglish")
 async def generate_hinglish(lesson_id: str, current_user: User = Depends(get_current_user)):
     lesson = await _require_lesson(lesson_id, current_user)
+    if lesson.hinglish:
+        return lesson.hinglish
     hinglish = await with_retries(hinglish_agent.generate_hinglish_content, lesson)
     await lesson_service.set_hinglish(lesson_id, hinglish)
     return hinglish
@@ -154,3 +178,20 @@ async def tutor_ask(
     lesson = await _require_lesson(lesson_id, current_user)
     answer = await with_retries(tutor_agent.ask_tutor, lesson, body.question)
     return {"answer": answer}
+
+
+@router.post("/{lesson_id}/tutor/ask/stream")
+async def tutor_ask_stream(
+    lesson_id: str, body: TutorQuestion, current_user: User = Depends(get_current_user)
+):
+    lesson = await _require_lesson(lesson_id, current_user)
+
+    async def event_gen():
+        try:
+            async for delta in tutor_agent.stream_tutor_answer(lesson, body.question):
+                yield f"data: {json.dumps({'delta': delta})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")

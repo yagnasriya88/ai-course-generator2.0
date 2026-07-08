@@ -12,6 +12,14 @@ from pydantic import BaseModel
 from app.agents.gemini_client import GEMINI_TTS_MODEL_NAME, generate_content, pcm_to_wav_base64
 from app.agents.llm import get_llm
 from app.models.lesson import HinglishContent, Lesson
+from app.services.cache import AsyncTTLCache
+
+# A lesson's Hinglish text+TTS audio is deterministic per lesson (content
+# doesn't change once generated) and TTS is the most expensive step here —
+# backstop cache in case a lesson is requested again before the DB-level
+# check (routes/lessons.py::generate_hinglish reads lesson.hinglish first)
+# catches it, e.g. a retried request racing the DB write.
+_hinglish_cache = AsyncTTLCache(maxsize=512, ttl=7 * 24 * 60 * 60)
 
 
 class HinglishTextSchema(BaseModel):
@@ -88,6 +96,14 @@ async def synthesize_audio(text: str) -> str:
 
 
 async def generate_hinglish_content(lesson: Lesson) -> HinglishContent:
+    cached = _hinglish_cache.get(lesson.id) if lesson.id else None
+    if cached is not None:
+        return cached
+
     text = await generate_hinglish_text(lesson)
     audio_base64 = await synthesize_audio(text)
-    return HinglishContent(text=text, audio_base64=audio_base64)
+    content = HinglishContent(text=text, audio_base64=audio_base64)
+
+    if lesson.id:
+        _hinglish_cache.set(lesson.id, content)
+    return content

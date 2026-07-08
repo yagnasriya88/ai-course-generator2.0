@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from typing import Awaitable, Callable, TypeVar
 
 from app.agents.gemini_keys import is_retryable_error, key_manager
@@ -14,11 +15,18 @@ async def with_retries(
     coro_fn: Callable[..., Awaitable[T]],
     *args,
     retries: int = 2,
-    delay_seconds: float = 1.5,
+    base_delay: float = 1.0,
+    max_delay: float = 8.0,
     **kwargs,
 ) -> T:
     """Agent output can fail to validate against its schema (malformed/partial
     JSON) or hit a transient API error — retry a few times before giving up.
+
+    Delay between attempts grows exponentially (base_delay * 2**attempt,
+    capped at max_delay) with +/-50% jitter — a flat delay either wastes time
+    on the first retry (often instantly recoverable) or under-backs-off
+    against sustained rate-limiting, and jitter avoids concurrent requests
+    all retrying in lockstep against the same rate limit.
 
     When the active text-gen provider is Gemini and a failure looks like a
     rate-limit/quota error, rotates to the next configured GEMINI_API_KEY*
@@ -44,6 +52,7 @@ async def with_retries(
                 exc,
             )
             if attempt < effective_retries:
-                await asyncio.sleep(delay_seconds)
+                delay = min(max_delay, base_delay * (2**attempt)) * (0.5 + random.random() * 0.5)
+                await asyncio.sleep(delay)
     assert last_exc is not None
     raise last_exc

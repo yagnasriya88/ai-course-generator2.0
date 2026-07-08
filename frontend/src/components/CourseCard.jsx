@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, Layers, Sparkles } from 'lucide-react'
@@ -95,4 +95,4 @@ function CourseCard({ course }) {
   )
 }
 
-export default CourseCard
+export default memo(CourseCard)

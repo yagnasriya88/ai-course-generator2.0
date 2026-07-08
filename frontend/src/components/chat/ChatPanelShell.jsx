@@ -62,7 +62,7 @@ function ChatPanelShell({
               {messages.map((m, i) => (
                 <ChatBubble key={i} role={m.role} text={m.text} isError={m.isError} />
               ))}
-              {pending && <TypingIndicator />}
+              {pending && messages[messages.length - 1]?.role === 'user' && <TypingIndicator />}
             </div>
           </div>
 

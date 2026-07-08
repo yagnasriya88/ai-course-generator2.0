@@ -13,9 +13,14 @@ from google.genai import types
 
 from app.agents.gemini_client import GEMINI_MODEL_NAME, generate_content
 from app.agents.video_agent import resolve_grounding_redirect
+from app.services.cache import AsyncTTLCache, cache_key
 
 _IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 _WIKIPEDIA_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/"
+
+# Same rationale as video_agent's discovery cache: grounded image search for a
+# given course topic doesn't meaningfully change minute-to-minute.
+_image_cache = AsyncTTLCache(maxsize=256, ttl=24 * 60 * 60)
 
 
 async def _looks_like_image(http_client: httpx.AsyncClient, url: str) -> bool:
@@ -68,6 +73,13 @@ async def _wikipedia_thumbnail(course_title: str) -> str | None:
 
 
 async def discover_topic_image(course_title: str, description: str) -> str | None:
-    return await _grounded_image_url(course_title, description) or await _wikipedia_thumbnail(
+    key = cache_key(course_title, description)
+    cached = _image_cache.get(key)
+    if cached is not None:
+        return cached or None
+
+    url = await _grounded_image_url(course_title, description) or await _wikipedia_thumbnail(
         course_title
     )
+    _image_cache.set(key, url or "")
+    return url

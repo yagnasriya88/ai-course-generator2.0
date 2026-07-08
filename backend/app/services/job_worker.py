@@ -12,7 +12,7 @@ from app.services import generation_service, job_service
 
 logger = logging.getLogger(__name__)
 
-POLL_INTERVAL_SECONDS = 2.0
+POLL_INTERVAL_SECONDS = 1.0
 
 _worker_tasks: list[asyncio.Task] = []
 

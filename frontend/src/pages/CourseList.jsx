@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { BookOpen, CheckCircle2, Circle, ListChecks, Plus, Search, Sparkles, X } from 'lucide-react'
@@ -139,14 +139,16 @@ function CourseList() {
   const visibleCourses = courses?.filter((c) =>
     tab === 'courses' ? c.is_platform : c.is_platform === false
   )
-  const filteredCourses = visibleCourses?.filter((c) => !level || c.level === level)
-  const searchedCourses = filteredCourses
-    ?.filter((c) => {
-      if (!query.trim()) return true
-      const q = query.trim().toLowerCase()
-      return c.title?.toLowerCase().includes(q) || c.tags?.some((t) => t.toLowerCase().includes(q))
-    })
-    .sort((a, b) => (sortBy === 'alphabetical' ? a.title.localeCompare(b.title) : 0))
+  const searchedCourses = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return visibleCourses
+      ?.filter((c) => !level || c.level === level)
+      .filter((c) => !q || c.title?.toLowerCase().includes(q) || c.tags?.some((t) => t.toLowerCase().includes(q)))
+      .sort((a, b) => (sortBy === 'alphabetical' ? a.title.localeCompare(b.title) : 0))
+    // visibleCourses is a fresh array every render (derived from courses+tab
+    // above), so depend on its actual inputs instead — otherwise this memo
+    // would recompute every render anyway.
+  }, [courses, tab, level, query, sortBy]) // eslint-disable-line react-hooks/exhaustive-deps
   const hasQuery = query.trim() !== ''
 
   return (

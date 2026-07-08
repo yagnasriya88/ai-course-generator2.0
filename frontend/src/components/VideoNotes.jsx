@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import Markdown from './Markdown'
 
 function VideoNotes({ notes }) {
   return (
@@ -9,7 +10,7 @@ function VideoNotes({ notes }) {
       className="overflow-hidden"
     >
       <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
-        <p className="text-slate-600">{notes.summary}</p>
+        <Markdown content={notes.summary} className="text-slate-600" />
 
         {notes.key_concepts?.length > 0 && (
           <div className="mt-3">
